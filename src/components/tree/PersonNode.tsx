@@ -5,6 +5,7 @@ import { Baby, Heart, Trash2 } from "lucide-react";
 import type { PersonData } from "@/types/models";
 import { formatBsYear } from "@/lib/nepali-date";
 import { genderClasses } from "@/lib/gender";
+import { PERSON_NODE_WIDTH, SPOUSE_LINE_Y } from "@/lib/tree-layout";
 
 export type PersonNodeData = {
   person: PersonData;
@@ -28,9 +29,13 @@ export function PersonNode({ data }: NodeProps<PersonFlowNode>) {
       <button
         type="button"
         onClick={() => onSelect?.(person)}
-        className={`flex w-36 flex-col items-center gap-1 rounded-lg border p-2 text-center shadow-sm hover:border-slate-400 sm:w-44 ${colors.card}`}
+        style={{ width: PERSON_NODE_WIDTH }}
+        className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-center shadow-sm hover:border-slate-400 ${colors.card}`}
       >
         <Handle type="target" position={Position.Top} />
+        {/* Hidden side handles for the horizontal couple line. */}
+        <Handle id="spouse-left" type="target" position={Position.Left} style={{ top: SPOUSE_LINE_Y, opacity: 0 }} />
+        <Handle id="spouse-right" type="source" position={Position.Right} style={{ top: SPOUSE_LINE_Y, opacity: 0 }} />
         {person.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

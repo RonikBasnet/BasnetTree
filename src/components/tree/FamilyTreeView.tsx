@@ -14,11 +14,12 @@ import { computeTreeLayout } from "@/lib/tree-layout";
 import { formatBsDate } from "@/lib/nepali-date";
 import { computeSiblingGroups } from "@/lib/siblings";
 import { PersonNode } from "@/components/tree/PersonNode";
+import { UnionNode } from "@/components/tree/UnionNode";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
-const nodeTypes: NodeTypes = { person: PersonNode };
+const nodeTypes: NodeTypes = { person: PersonNode, union: UnionNode };
 
 interface FamilyTreeViewProps {
   people: PersonData[];
