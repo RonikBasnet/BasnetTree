@@ -1,18 +1,22 @@
-import type { Edge } from "@xyflow/react";
+import type { BuiltInEdge, Edge } from "@xyflow/react";
 import type { PersonData } from "@/types/models";
 import type { PersonFlowNode } from "@/components/tree/PersonNode";
-import type { UnionFlowNode } from "@/components/tree/UnionNode";
+import { UNION_NODE_SIZE, type UnionFlowNode } from "@/components/tree/UnionNode";
 import { compareBirthOrder } from "@/lib/siblings";
 
 // Every person node is PERSON_NODE_WIDTH wide inside a SLOT_WIDTH slot; the gap
 // between two slots is where a couple's line down to their children drops.
 export const PERSON_NODE_WIDTH = 176;
 const SLOT_WIDTH = 210;
-const LEVEL_HEIGHT = 210;
+const LEVEL_HEIGHT = 240;
 // Height (from a node's top) of the couple line and the side handles it uses.
 export const SPOUSE_LINE_Y = 36;
-// Where the junction of a couple that isn't side by side sits below their row.
-const BRACKET_Y = 122;
+// Where the junction of a couple that isn't side by side sits below their row
+// (below even the tallest cards, whose height depends on name length/photo).
+const BRACKET_Y = 180;
+// The horizontal part of every line down to children runs this far above the
+// children's row, so it never cuts through the (variable-height) parent cards.
+const FORK_GAP = 28;
 
 export type TreeNode = PersonFlowNode | UnionFlowNode;
 
@@ -277,29 +281,44 @@ export function computeTreeLayout(people: PersonData[]): {
     const color = unionColors.get(key);
     const style = { stroke: color ?? DEFAULT_EDGE_COLOR, strokeWidth: color ? 2 : 1.5 };
 
-    let sourceId = parentIds[0];
-    if (parentIds.length > 1) {
-      const isCouple = parentIds.length === 2 && sideBySide(parentIds[0], parentIds[1]);
-      const centerX = parentIds.reduce((sum, id) => sum + xOf(id), 0) / parentIds.length + PERSON_NODE_WIDTH / 2;
-      const rowY = Math.max(...parentIds.map(yOf));
-      sourceId = `union-${key}`;
-      nodes.push({
-        id: sourceId,
-        type: "union",
-        position: { x: centerX, y: rowY + (isCouple ? SPOUSE_LINE_Y : BRACKET_Y) },
-        data: {},
-        selectable: false,
-        draggable: false,
-      });
-      if (!isCouple) {
-        for (const parentId of parentIds) {
-          edges.push({ id: `bracket-${parentId}-${key}`, source: parentId, target: sourceId, type: "smoothstep", style });
-        }
+    // Every set of parents gets a junction the child lines start from. For a
+    // single parent or a side-by-side couple it sits at couple-line height (behind
+    // the card / in the gap between the two cards), so its position is known
+    // regardless of card height.
+    const isCouple = parentIds.length === 2 && sideBySide(parentIds[0], parentIds[1]);
+    const isBracket = parentIds.length > 1 && !isCouple;
+    const junctionX = parentIds.reduce((sum, id) => sum + xOf(id), 0) / parentIds.length + PERSON_NODE_WIDTH / 2;
+    const junctionY = Math.max(...parentIds.map(yOf)) + (isBracket ? BRACKET_Y : SPOUSE_LINE_Y);
+    const junctionId = `union-${key}`;
+    nodes.push({
+      id: junctionId,
+      type: "union",
+      position: { x: junctionX - UNION_NODE_SIZE / 2, y: junctionY - UNION_NODE_SIZE / 2 },
+      data: {},
+      selectable: false,
+      draggable: false,
+    });
+    if (isBracket) {
+      for (const parentId of parentIds) {
+        edges.push({ id: `bracket-${parentId}-${key}`, source: parentId, target: junctionId, type: "smoothstep", style });
       }
     }
 
     for (const child of children) {
-      edges.push({ id: `child-${key}-${child._id}`, source: sourceId, target: child._id, type: "smoothstep", style });
+      // Put the step FORK_GAP above the child's row (stepPosition is the fraction
+      // of the vertical distance from the junction to the child's top).
+      const childY = yOf(child._id);
+      const span = childY - junctionY;
+      const stepPosition = span > FORK_GAP ? (span - FORK_GAP) / span : 0.5;
+      const edge: BuiltInEdge = {
+        id: `child-${key}-${child._id}`,
+        source: junctionId,
+        target: child._id,
+        type: "smoothstep",
+        pathOptions: { offset: 0, stepPosition },
+        style,
+      };
+      edges.push(edge);
     }
   }
 

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, Network, Pencil, Plus, Search, Trash2, Users, ChevronUp, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { LayoutGrid, Network, Pencil, Plus, Search, Trash2, Users, ChevronUp, ChevronDown, Download, Upload, Loader2, X } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,11 @@ export function PeopleManager({
   const [preset, setPreset] = useState<RelationPreset>({});
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"list" | "tree">("list");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<
+    { error: string } | { created: number; updated: number; warnings: string[] } | null
+  >(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p._id, p])), [people]);
 
@@ -113,6 +118,28 @@ export function PeopleManager({
     }
   }
 
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await fetch(`/api/families/${familyId}/csv`, {
+        method: "POST",
+        headers: { "Content-Type": "text/csv" },
+        body: await file.text(),
+      });
+      const data = await res.json();
+      setImportResult(res.ok ? data : { error: data.error ?? "Import failed" });
+      if (res.ok) router.refresh();
+    } catch {
+      setImportResult({ error: "Import failed" });
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function relationshipSummary(person: PersonData) {
     const parentNames = person.parents.map((id) => peopleById.get(id)?.name).filter(Boolean);
     const spouseNames = person.spouses.map((id) => peopleById.get(id)?.name).filter(Boolean);
@@ -165,11 +192,74 @@ export function PeopleManager({
             </div>
           )}
         </div>
-        <Button onClick={() => openAddDialog()} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Add person
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/families/${familyId}/csv`}
+            download
+            title="Download everyone as a CSV file"
+            className={buttonVariants({ variant: "outline", className: "gap-1.5" })}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </a>
+          <Button
+            variant="outline"
+            className="gap-1.5"
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+            title="Add or update people from a CSV file (same columns as the export)"
+          >
+            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Import CSV
+          </Button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleImport}
+          />
+          <Button onClick={() => openAddDialog()} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Add person
+          </Button>
+        </div>
       </div>
+
+      {importResult && (
+        <div
+          className={`relative rounded-lg border p-3 pr-9 text-sm ${
+            "error" in importResult
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setImportResult(null)}
+            className="absolute right-2 top-2 text-current opacity-60 hover:opacity-100"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {"error" in importResult ? (
+            <p>{importResult.error}</p>
+          ) : (
+            <>
+              <p>
+                Import finished: {importResult.created} added, {importResult.updated} updated.
+              </p>
+              {importResult.warnings.length > 0 && (
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-700">
+                  {importResult.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {view === "tree" ? (
         people.length === 0 ? (
