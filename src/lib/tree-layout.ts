@@ -5,6 +5,35 @@ import type { PersonFlowNode } from "@/components/tree/PersonNode";
 const NODE_WIDTH = 200;
 const LEVEL_HEIGHT = 160;
 
+// Sorts siblings (people sharing the exact same set of parents) by their `order`
+// field, while leaving the relative order of different sibling groups and of
+// people with no parents untouched (based on where each group first appears).
+function sortSiblingsByOrder(people: PersonData[]): PersonData[] {
+  const byId = new Map(people.map((p) => [p._id, p]));
+  const groupKeyOf = new Map<string, string>();
+  const groupFirstIndex = new Map<string, number>();
+
+  people.forEach((person, index) => {
+    const validParents = person.parents.filter((id) => byId.has(id));
+    const key = validParents.length > 0 ? [...validParents].sort().join("|") : `__single-${person._id}`;
+    groupKeyOf.set(person._id, key);
+    if (!groupFirstIndex.has(key)) groupFirstIndex.set(key, index);
+  });
+
+  return people
+    .map((person, index) => ({ person, index }))
+    .sort((a, b) => {
+      const groupA = groupFirstIndex.get(groupKeyOf.get(a.person._id)!)!;
+      const groupB = groupFirstIndex.get(groupKeyOf.get(b.person._id)!)!;
+      if (groupA !== groupB) return groupA - groupB;
+      const orderA = a.person.order ?? a.index;
+      const orderB = b.person.order ?? b.index;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.index - b.index;
+    })
+    .map((x) => x.person);
+}
+
 // Computes a generation (row) for each person via relaxation: a child must be
 // one level below its deepest parent, and spouses must always share a level
 // (so someone marrying into the family lines up with their partner's row).
@@ -114,10 +143,11 @@ function computeUnionColors(people: PersonData[]): Map<string, string> {
   return colorByKey;
 }
 
-export function computeTreeLayout(people: PersonData[]): {
+export function computeTreeLayout(rawPeople: PersonData[]): {
   nodes: PersonFlowNode[];
   edges: Edge[];
 } {
+  const people = sortSiblingsByOrder(rawPeople);
   const levels = computeLevels(people);
   const byLevel = new Map<number, PersonData[]>();
   for (const person of people) {

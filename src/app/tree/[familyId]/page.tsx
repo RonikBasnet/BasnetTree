@@ -33,6 +33,7 @@ export default async function TreePage({
     userId: p.userId ? String(p.userId) : undefined,
     parents: (p.parents ?? []).map(String),
     spouses: (p.spouses ?? []).map(String),
+    order: p.order ?? 0,
   }));
 
   return (

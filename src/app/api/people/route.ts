@@ -27,6 +27,20 @@ export async function POST(request: NextRequest) {
   }
 
   await connectToDatabase();
-  const person = await Person.create(parsed.data);
+
+  // Default new siblings to the end of the birth-order list unless an explicit order was given.
+  let order = parsed.data.order;
+  if (order === undefined) {
+    const parents = parsed.data.parents ?? [];
+    order =
+      parents.length > 0
+        ? await Person.countDocuments({
+            familyId: parsed.data.familyId,
+            parents: { $all: parents, $size: parents.length },
+          })
+        : 0;
+  }
+
+  const person = await Person.create({ ...parsed.data, order });
   return NextResponse.json(person, { status: 201 });
 }

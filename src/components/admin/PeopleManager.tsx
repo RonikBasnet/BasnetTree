@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutGrid, Network, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { LayoutGrid, Network, Pencil, Plus, Search, Trash2, Users, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,60 @@ export function PeopleManager({
   const [view, setView] = useState<"list" | "tree">("list");
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p._id, p])), [people]);
+
+  // Groups people sharing the exact same parents (siblings), sorted by birth order.
+  const siblingGroups = useMemo(() => {
+    const groups = new Map<string, PersonData[]>();
+    for (const person of people) {
+      if (person.parents.length === 0) continue;
+      const key = [...person.parents].sort().join("|");
+      const group = groups.get(key) ?? [];
+      group.push(person);
+      groups.set(key, group);
+    }
+    for (const group of groups.values()) {
+      group.sort((a, b) => a.order - b.order);
+    }
+    return groups;
+  }, [people]);
+
+  function siblingKeyOf(person: PersonData) {
+    return person.parents.length > 0 ? [...person.parents].sort().join("|") : null;
+  }
+
+  async function handleReorder(person: PersonData, direction: "up" | "down") {
+    const key = siblingKeyOf(person);
+    if (!key) return;
+    const group = siblingGroups.get(key) ?? [];
+    const index = group.findIndex((p) => p._id === person._id);
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (index === -1 || swapIndex < 0 || swapIndex >= group.length) return;
+    const other = group[swapIndex];
+    const personOrder = person.order;
+    const otherOrder = other.order;
+
+    setPeople((prev) =>
+      prev.map((p) => {
+        if (p._id === person._id) return { ...p, order: otherOrder };
+        if (p._id === other._id) return { ...p, order: personOrder };
+        return p;
+      })
+    );
+
+    await Promise.all([
+      fetch(`/api/people/${person._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: otherOrder }),
+      }),
+      fetch(`/api/people/${other._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: personOrder }),
+      }),
+    ]);
+    router.refresh();
+  }
 
   const filteredPeople = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -178,6 +232,9 @@ export function PeopleManager({
               .filter(Boolean)
               .join(" \u2013 ");
             const summary = relationshipSummary(person);
+            const siblingKey = siblingKeyOf(person);
+            const siblingGroup = siblingKey ? siblingGroups.get(siblingKey) ?? [] : [];
+            const siblingIndex = siblingGroup.findIndex((p) => p._id === person._id);
             return (
               <Card key={person._id} className={genderClasses(person.gender).card}>
                 <CardContent className="space-y-3 p-4">
@@ -214,6 +271,30 @@ export function PeopleManager({
                   )}
 
                   <div className="flex gap-2">
+                    {siblingGroup.length > 1 && (
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-5 w-7 bg-white/70 p-0"
+                          disabled={siblingIndex <= 0}
+                          title="Move up in birth order"
+                          onClick={() => handleReorder(person, "up")}
+                        >
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-5 w-7 bg-white/70 p-0"
+                          disabled={siblingIndex === -1 || siblingIndex >= siblingGroup.length - 1}
+                          title="Move down in birth order"
+                          onClick={() => handleReorder(person, "down")}
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

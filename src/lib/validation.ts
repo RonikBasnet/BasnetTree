@@ -15,4 +15,5 @@ export const personInputSchema = z.object({
   bio: z.string().trim().optional(),
   parents: z.array(z.string()).optional(),
   spouses: z.array(z.string()).optional(),
+  order: z.number().int().optional(),
 });

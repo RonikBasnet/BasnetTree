@@ -39,6 +39,9 @@ export function PersonForm({
   const [photoUrl, setPhotoUrl] = useState(existingPerson?.photoUrl ?? "");
   const [parents, setParents] = useState<string[]>(existingPerson?.parents ?? presetParents ?? []);
   const [spouses, setSpouses] = useState<string[]>(existingPerson?.spouses ?? presetSpouses ?? []);
+  const [birthOrder, setBirthOrder] = useState(
+    existingPerson ? String(existingPerson.order) : ""
+  );
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +83,7 @@ export function PersonForm({
         photoUrl: photoUrl || undefined,
         parents,
         spouses,
+        order: birthOrder.trim() === "" ? undefined : Number(birthOrder),
       };
       const url = existingPerson ? `/api/people/${existingPerson._id}` : "/api/people";
       const method = existingPerson ? "PATCH" : "POST";
@@ -171,6 +175,18 @@ export function PersonForm({
           <Label>Spouse(s)</Label>
           <PeoplePicker people={selectablePeople} selected={spouses} onChange={setSpouses} />
         </div>
+        {parents.length > 0 && (
+          <div className="space-y-1">
+            <Label htmlFor="birthOrder">Birth order among siblings</Label>
+            <Input
+              id="birthOrder"
+              type="number"
+              value={birthOrder}
+              onChange={(e) => setBirthOrder(e.target.value)}
+              placeholder="Lower number = older. Leave blank to add at the end."
+            />
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
