@@ -28,7 +28,7 @@ export function PersonNode({ data }: NodeProps<PersonFlowNode>) {
       <button
         type="button"
         onClick={() => onSelect?.(person)}
-        className={`flex w-44 flex-col items-center gap-1 rounded-lg border p-2 text-center shadow-sm hover:border-slate-400 ${colors.card}`}
+        className={`flex w-36 flex-col items-center gap-1 rounded-lg border p-2 text-center shadow-sm hover:border-slate-400 sm:w-44 ${colors.card}`}
       >
         <Handle type="target" position={Position.Top} />
         {person.photoUrl ? (
@@ -36,10 +36,10 @@ export function PersonNode({ data }: NodeProps<PersonFlowNode>) {
           <img
             src={person.photoUrl}
             alt={person.name}
-            className="h-12 w-12 rounded-full object-cover ring-2 ring-white"
+            className="h-10 w-10 rounded-full object-cover ring-2 ring-white sm:h-12 sm:w-12"
           />
         ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/70 font-medium text-slate-500 ring-2 ring-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/70 font-medium text-slate-500 ring-2 ring-white sm:h-12 sm:w-12">
             {person.name.charAt(0).toUpperCase()}
           </div>
         )}

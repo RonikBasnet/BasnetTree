@@ -55,8 +55,8 @@ export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete }: Fami
   }
 
   return (
-    <div className="relative h-[70vh] w-full overflow-hidden rounded-lg border border-slate-200">
-      <div className="absolute left-3 top-3 z-10 w-64">
+    <div className="relative h-[60vh] w-full overflow-hidden rounded-lg border border-slate-200 sm:h-[70vh]">
+      <div className="absolute left-2 right-2 top-2 z-10 sm:left-3 sm:right-auto sm:top-3 sm:w-64">
         <Input
           placeholder="Search for a person..."
           value={query}
@@ -84,7 +84,7 @@ export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete }: Fami
       </div>
 
       {selected && (
-        <Card className="absolute right-3 top-3 z-10 w-72">
+        <Card className="fixed inset-x-2 bottom-2 z-20 max-h-[45vh] overflow-y-auto sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-3 sm:max-h-[60vh] sm:w-72">
           <CardHeader className="flex flex-row items-center justify-between">
             <span className="font-semibold">{selected.name}</span>
             <button
@@ -118,6 +118,26 @@ export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete }: Fami
                   .join(", ")}
               </p>
             )}
+            {onAddRelative && (
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => onAddRelative(selected, "spouse")}
+                >
+                  Add spouse
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => onAddRelative(selected, "child")}
+                >
+                  Add child
+                </Button>
+              </div>
+            )}
             {onEdit && (
               <Button size="sm" className="mt-2 w-full" onClick={() => onEdit(selected)}>
                 Edit person
@@ -145,11 +165,12 @@ export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete }: Fami
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
+        zoomOnPinch
         proOptions={{ hideAttribution: true }}
       >
         <Background />
         <Controls />
-        <MiniMap />
+        <MiniMap className="hidden sm:block" />
       </ReactFlow>
     </div>
   );
