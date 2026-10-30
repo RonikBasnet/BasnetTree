@@ -12,6 +12,7 @@ import { PersonForm } from "@/components/admin/PersonForm";
 import { FamilyTreeView } from "@/components/tree/FamilyTreeView";
 import { formatBsYear } from "@/lib/nepali-date";
 import { genderClasses } from "@/lib/gender";
+import { computeSiblingGroups, siblingKeyOf } from "@/lib/siblings";
 import type { PersonData } from "@/types/models";
 
 interface RelationPreset {
@@ -36,24 +37,7 @@ export function PeopleManager({
   const peopleById = useMemo(() => new Map(people.map((p) => [p._id, p])), [people]);
 
   // Groups people sharing the exact same parents (siblings), sorted by birth order.
-  const siblingGroups = useMemo(() => {
-    const groups = new Map<string, PersonData[]>();
-    for (const person of people) {
-      if (person.parents.length === 0) continue;
-      const key = [...person.parents].sort().join("|");
-      const group = groups.get(key) ?? [];
-      group.push(person);
-      groups.set(key, group);
-    }
-    for (const group of groups.values()) {
-      group.sort((a, b) => a.order - b.order);
-    }
-    return groups;
-  }, [people]);
-
-  function siblingKeyOf(person: PersonData) {
-    return person.parents.length > 0 ? [...person.parents].sort().join("|") : null;
-  }
+  const siblingGroups = useMemo(() => computeSiblingGroups(people), [people]);
 
   async function handleReorder(person: PersonData, direction: "up" | "down") {
     const key = siblingKeyOf(person);
@@ -210,6 +194,7 @@ export function PeopleManager({
               onAddRelative={handleAddRelative}
               onEdit={setEditing}
               onDelete={(person) => handleDelete(person._id)}
+              onReorder={handleReorder}
             />
           </>
         )

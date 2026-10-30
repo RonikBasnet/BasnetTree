@@ -12,6 +12,7 @@ import "@xyflow/react/dist/style.css";
 import type { PersonData } from "@/types/models";
 import { computeTreeLayout } from "@/lib/tree-layout";
 import { formatBsDate } from "@/lib/nepali-date";
+import { computeSiblingGroups, siblingKeyOf } from "@/lib/siblings";
 import { PersonNode } from "@/components/tree/PersonNode";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,14 +25,20 @@ interface FamilyTreeViewProps {
   onAddRelative?: (person: PersonData, type: "spouse" | "child") => void;
   onEdit?: (person: PersonData) => void;
   onDelete?: (person: PersonData) => void;
+  onReorder?: (person: PersonData, direction: "up" | "down") => void;
 }
 
-export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete }: FamilyTreeViewProps) {
+export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete, onReorder }: FamilyTreeViewProps) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const peopleById = useMemo(() => new Map(people.map((p) => [p._id, p])), [people]);
+  const siblingGroups = useMemo(() => computeSiblingGroups(people), [people]);
   // Derived from current data so the panel auto-closes if the selected person is deleted.
   const selected = selectedId ? peopleById.get(selectedId) ?? null : null;
+  const selectedSiblings = selected ? siblingGroups.get(siblingKeyOf(selected) ?? "") ?? [] : [];
+  const selectedSiblingIndex = selected
+    ? selectedSiblings.findIndex((p) => p._id === selected._id)
+    : -1;
 
   const { nodes, edges } = useMemo(() => {
     const layout = computeTreeLayout(people);
@@ -117,6 +124,31 @@ export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete }: Fami
                   .filter(Boolean)
                   .join(", ")}
               </p>
+            )}
+            {onReorder && selectedSiblings.length > 1 && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-xs text-slate-400">Birth order</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-7 p-0"
+                  disabled={selectedSiblingIndex <= 0}
+                  title="Move up in birth order"
+                  onClick={() => onReorder(selected, "up")}
+                >
+                  ↑
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-7 p-0"
+                  disabled={selectedSiblingIndex === -1 || selectedSiblingIndex >= selectedSiblings.length - 1}
+                  title="Move down in birth order"
+                  onClick={() => onReorder(selected, "down")}
+                >
+                  ↓
+                </Button>
+              </div>
             )}
             {onAddRelative && (
               <div className="flex gap-2 pt-1">
