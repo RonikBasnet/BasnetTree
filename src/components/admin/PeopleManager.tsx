@@ -12,7 +12,7 @@ import { PersonForm } from "@/components/admin/PersonForm";
 import { FamilyTreeView } from "@/components/tree/FamilyTreeView";
 import { formatBsYear } from "@/lib/nepali-date";
 import { genderClasses } from "@/lib/gender";
-import { computeSiblingGroups, siblingKeyOf } from "@/lib/siblings";
+import { computeSiblingGroups, renumberGroup } from "@/lib/siblings";
 import type { PersonData } from "@/types/models";
 
 interface RelationPreset {
@@ -36,40 +36,28 @@ export function PeopleManager({
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p._id, p])), [people]);
 
-  // Groups people sharing the exact same parents (siblings), sorted by birth order.
+  // Groups people sharing a parent (siblings, incl. half-siblings), sorted by birth order.
   const siblingGroups = useMemo(() => computeSiblingGroups(people), [people]);
 
   async function handleReorder(person: PersonData, direction: "up" | "down") {
-    const key = siblingKeyOf(person);
-    if (!key) return;
-    const group = siblingGroups.get(key) ?? [];
+    const group = siblingGroups.get(person._id) ?? [];
     const index = group.findIndex((p) => p._id === person._id);
     const swapIndex = direction === "up" ? index - 1 : index + 1;
     if (index === -1 || swapIndex < 0 || swapIndex >= group.length) return;
-    const other = group[swapIndex];
-    const personOrder = person.order;
-    const otherOrder = other.order;
+    // Renumber the whole group 1..n (rather than swapping raw values) so siblings
+    // that share a duplicate order still move.
+    const position = swapIndex + 1;
+    const orders = renumberGroup(group, person._id, position);
 
     setPeople((prev) =>
-      prev.map((p) => {
-        if (p._id === person._id) return { ...p, order: otherOrder };
-        if (p._id === other._id) return { ...p, order: personOrder };
-        return p;
-      })
+      prev.map((p) => (orders.has(p._id) ? { ...p, order: orders.get(p._id)! } : p))
     );
 
-    await Promise.all([
-      fetch(`/api/people/${person._id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: otherOrder }),
-      }),
-      fetch(`/api/people/${other._id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: personOrder }),
-      }),
-    ]);
+    await fetch(`/api/people/${person._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: position }),
+    });
     router.refresh();
   }
 
@@ -217,8 +205,7 @@ export function PeopleManager({
               .filter(Boolean)
               .join(" \u2013 ");
             const summary = relationshipSummary(person);
-            const siblingKey = siblingKeyOf(person);
-            const siblingGroup = siblingKey ? siblingGroups.get(siblingKey) ?? [] : [];
+            const siblingGroup = siblingGroups.get(person._id) ?? [];
             const siblingIndex = siblingGroup.findIndex((p) => p._id === person._id);
             return (
               <Card key={person._id} className={genderClasses(person.gender).card}>

@@ -12,7 +12,7 @@ import "@xyflow/react/dist/style.css";
 import type { PersonData } from "@/types/models";
 import { computeTreeLayout } from "@/lib/tree-layout";
 import { formatBsDate } from "@/lib/nepali-date";
-import { computeSiblingGroups, siblingKeyOf } from "@/lib/siblings";
+import { computeSiblingGroups } from "@/lib/siblings";
 import { PersonNode } from "@/components/tree/PersonNode";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,7 @@ export function FamilyTreeView({ people, onAddRelative, onEdit, onDelete, onReor
   const siblingGroups = useMemo(() => computeSiblingGroups(people), [people]);
   // Derived from current data so the panel auto-closes if the selected person is deleted.
   const selected = selectedId ? peopleById.get(selectedId) ?? null : null;
-  const selectedSiblings = selected ? siblingGroups.get(siblingKeyOf(selected) ?? "") ?? [] : [];
+  const selectedSiblings = selected ? siblingGroups.get(selected._id) ?? [] : [];
   const selectedSiblingIndex = selected
     ? selectedSiblings.findIndex((p) => p._id === selected._id)
     : -1;

@@ -1,37 +1,65 @@
 import type { Edge } from "@xyflow/react";
 import type { PersonData } from "@/types/models";
 import type { PersonFlowNode } from "@/components/tree/PersonNode";
+import { compareBirthOrder } from "@/lib/siblings";
 
 const NODE_WIDTH = 200;
 const LEVEL_HEIGHT = 160;
 
-// Sorts siblings (people sharing the exact same set of parents) by their `order`
-// field, while leaving the relative order of different sibling groups and of
-// people with no parents untouched (based on where each group first appears).
-function sortSiblingsByOrder(people: PersonData[]): PersonData[] {
+// Orders people depth-first through the family: each person, then their
+// spouse(s), then all of their children sorted by birth order. Rows are later
+// laid out in this order, so siblings appear oldest-first (left to right) and
+// each generation follows the order of the one above it. Founders (no parents,
+// not married to someone with parents) start the walk; anyone unreachable is
+// appended at the end.
+function orderByFamily(people: PersonData[]): PersonData[] {
   const byId = new Map(people.map((p) => [p._id, p]));
-  const groupKeyOf = new Map<string, string>();
-  const groupFirstIndex = new Map<string, number>();
+  const childrenOf = new Map<string, PersonData[]>();
+  for (const person of people) {
+    for (const parentId of person.parents) {
+      if (!byId.has(parentId)) continue;
+      const list = childrenOf.get(parentId) ?? [];
+      list.push(person);
+      childrenOf.set(parentId, list);
+    }
+  }
+  const hasParents = (p: PersonData) => p.parents.some((id) => byId.has(id));
 
-  people.forEach((person, index) => {
-    const validParents = person.parents.filter((id) => byId.has(id));
-    const key = validParents.length > 0 ? [...validParents].sort().join("|") : `__single-${person._id}`;
-    groupKeyOf.set(person._id, key);
-    if (!groupFirstIndex.has(key)) groupFirstIndex.set(key, index);
-  });
+  const visited = new Set<string>();
+  const ordered: PersonData[] = [];
 
-  return people
-    .map((person, index) => ({ person, index }))
-    .sort((a, b) => {
-      const groupA = groupFirstIndex.get(groupKeyOf.get(a.person._id)!)!;
-      const groupB = groupFirstIndex.get(groupKeyOf.get(b.person._id)!)!;
-      if (groupA !== groupB) return groupA - groupB;
-      const orderA = a.person.order ?? a.index;
-      const orderB = b.person.order ?? b.index;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.index - b.index;
-    })
-    .map((x) => x.person);
+  function visit(person: PersonData) {
+    if (visited.has(person._id)) return;
+    visited.add(person._id);
+    ordered.push(person);
+
+    const couple = [person];
+    for (const spouseId of person.spouses) {
+      const spouse = byId.get(spouseId);
+      if (!spouse || visited.has(spouseId)) continue;
+      visited.add(spouseId);
+      ordered.push(spouse);
+      couple.push(spouse);
+    }
+
+    const children = new Map<string, PersonData>();
+    for (const parent of couple) {
+      for (const child of childrenOf.get(parent._id) ?? []) children.set(child._id, child);
+    }
+    [...children.values()].sort(compareBirthOrder).forEach(visit);
+  }
+
+  const founders = people
+    .filter((p) => !hasParents(p))
+    .filter((p) => !p.spouses.some((id) => {
+      const spouse = byId.get(id);
+      return spouse !== undefined && hasParents(spouse);
+    }))
+    .sort(compareBirthOrder);
+  founders.forEach(visit);
+  [...people].sort(compareBirthOrder).forEach(visit);
+
+  return ordered;
 }
 
 // Computes a generation (row) for each person via relaxation: a child must be
@@ -147,7 +175,7 @@ export function computeTreeLayout(rawPeople: PersonData[]): {
   nodes: PersonFlowNode[];
   edges: Edge[];
 } {
-  const people = sortSiblingsByOrder(rawPeople);
+  const people = orderByFamily(rawPeople);
   const levels = computeLevels(people);
   const byLevel = new Map<number, PersonData[]>();
   for (const person of people) {

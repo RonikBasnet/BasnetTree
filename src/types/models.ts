@@ -12,7 +12,7 @@ export interface PersonData {
   userId?: string | null;
   parents: string[];
   spouses: string[];
-  // Birth order among siblings sharing the same parents (lower = older).
+  // Birth order (1..n) among siblings sharing a parent (lower = older).
   order: number;
 }
 

@@ -13,7 +13,7 @@ const personSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: "User" },
     parents: [{ type: Schema.Types.ObjectId, ref: "Person" }],
     spouses: [{ type: Schema.Types.ObjectId, ref: "Person" }],
-    // Birth order among siblings sharing the same parents (lower = older). Used to
+    // Birth order (1..n) among siblings sharing a parent (lower = older). Used to
     // keep sibling order stable/controllable in the tree instead of arbitrary DB order.
     order: { type: Number, default: 0 },
   },

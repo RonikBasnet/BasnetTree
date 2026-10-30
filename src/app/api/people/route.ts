@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Person } from "@/models/Person";
 import { requireAdmin } from "@/lib/require-admin";
 import { personInputSchema } from "@/lib/validation";
+import { applyBirthOrder } from "@/lib/sibling-order";
 
 // Public: fetch all people in a family to render the tree (?familyId=...).
 export async function GET(request: NextRequest) {
@@ -28,19 +29,10 @@ export async function POST(request: NextRequest) {
 
   await connectToDatabase();
 
-  // Default new siblings to the end of the birth-order list unless an explicit order was given.
-  let order = parsed.data.order;
-  if (order === undefined) {
-    const parents = parsed.data.parents ?? [];
-    order =
-      parents.length > 0
-        ? await Person.countDocuments({
-            familyId: parsed.data.familyId,
-            parents: { $all: parents, $size: parents.length },
-          })
-        : 0;
-  }
-
-  const person = await Person.create({ ...parsed.data, order });
-  return NextResponse.json(person, { status: 201 });
+  const person = await Person.create(parsed.data);
+  // Slots the new person into their sibling group (at the end unless an explicit
+  // order was given) and renumbers siblings so orders stay unique.
+  await applyBirthOrder(parsed.data.familyId, String(person._id), parsed.data.order);
+  const saved = await Person.findById(person._id);
+  return NextResponse.json(saved, { status: 201 });
 }

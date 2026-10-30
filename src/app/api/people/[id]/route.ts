@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Person } from "@/models/Person";
 import { requireAdmin } from "@/lib/require-admin";
 import { personInputSchema } from "@/lib/validation";
+import { applyBirthOrder } from "@/lib/sibling-order";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -31,6 +32,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const person = await Person.findByIdAndUpdate(id, parsed.data, { new: true });
   if (!person) {
     return NextResponse.json({ error: "Person not found" }, { status: 404 });
+  }
+  // Renumber the sibling group when birth order or parents change, so a
+  // duplicate order inserts this person there instead of tying with a sibling.
+  if (parsed.data.order !== undefined || parsed.data.parents !== undefined) {
+    await applyBirthOrder(String(person.familyId), id, parsed.data.order ?? person.order);
+    return NextResponse.json(await Person.findById(id));
   }
   return NextResponse.json(person);
 }
