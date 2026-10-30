@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { NepaliDateInput } from "@/components/ui/nepali-date-input";
 import { PeoplePicker } from "@/components/admin/PeoplePicker";
 import { genderClasses } from "@/lib/gender";
+import { assumedParents, spousesOf } from "@/lib/spouses";
 import type { PersonData } from "@/types/models";
 
 interface PersonFormProps {
@@ -48,6 +49,26 @@ export function PersonForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectablePeople = people.filter((p) => p._id !== existingPerson?._id);
+
+  // When a single parent is picked, assume their spouse is the other parent if
+  // they have exactly one (multiple marriages are left to the suggestions below).
+  function handleParentsChange(next: string[]) {
+    const added = next.filter((id) => !parents.includes(id));
+    if (next.length === 1 && added.length === 1) {
+      const assumed = assumedParents(people, added[0]).filter((id) => id !== existingPerson?._id);
+      setParents(assumed);
+      return;
+    }
+    setParents(next);
+  }
+
+  // With exactly one parent selected, offer that parent's spouses as the other parent.
+  const otherParentSuggestions =
+    parents.length === 1
+      ? spousesOf(people, parents[0])
+          .filter((id) => id !== existingPerson?._id)
+          .map((id) => people.find((p) => p._id === id)!)
+      : [];
 
   async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -169,7 +190,22 @@ export function PersonForm({
         <p className="text-sm font-semibold text-slate-700">Link to family members</p>
         <div className="space-y-1">
           <Label>Parents</Label>
-          <PeoplePicker people={selectablePeople} selected={parents} onChange={setParents} />
+          <PeoplePicker people={selectablePeople} selected={parents} onChange={handleParentsChange} />
+          {otherParentSuggestions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-slate-500">
+              <span>Other parent:</span>
+              {otherParentSuggestions.map((spouse) => (
+                <button
+                  key={spouse._id}
+                  type="button"
+                  className="rounded-full border border-slate-200 px-2 py-0.5 text-slate-700 hover:bg-slate-100"
+                  onClick={() => setParents([...parents, spouse._id])}
+                >
+                  + {spouse.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="space-y-1">
           <Label>Spouse(s)</Label>

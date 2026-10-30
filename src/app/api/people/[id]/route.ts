@@ -4,6 +4,7 @@ import { Person } from "@/models/Person";
 import { requireAdmin } from "@/lib/require-admin";
 import { personInputSchema } from "@/lib/validation";
 import { applyBirthOrder } from "@/lib/sibling-order";
+import { syncSpouseLinks } from "@/lib/spouse-links";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -29,9 +30,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   await connectToDatabase();
-  const person = await Person.findByIdAndUpdate(id, parsed.data, { new: true });
-  if (!person) {
+  const data = parsed.data.spouses
+    ? { ...parsed.data, spouses: parsed.data.spouses.filter((spouseId) => spouseId !== id) }
+    : parsed.data;
+  const previous = await Person.findById(id).select("spouses").lean();
+  const person = await Person.findByIdAndUpdate(id, data, { new: true });
+  if (!previous || !person) {
     return NextResponse.json({ error: "Person not found" }, { status: 404 });
+  }
+  if (data.spouses) {
+    await syncSpouseLinks(id, (previous.spouses ?? []).map(String), data.spouses);
   }
   // Renumber the sibling group when birth order or parents change, so a
   // duplicate order inserts this person there instead of tying with a sibling.

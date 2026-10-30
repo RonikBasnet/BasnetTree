@@ -4,6 +4,7 @@ import { Person } from "@/models/Person";
 import { requireAdmin } from "@/lib/require-admin";
 import { personInputSchema } from "@/lib/validation";
 import { applyBirthOrder } from "@/lib/sibling-order";
+import { syncSpouseLinks } from "@/lib/spouse-links";
 
 // Public: fetch all people in a family to render the tree (?familyId=...).
 export async function GET(request: NextRequest) {
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
   await connectToDatabase();
 
   const person = await Person.create(parsed.data);
+  await syncSpouseLinks(String(person._id), [], parsed.data.spouses ?? []);
   // Slots the new person into their sibling group (at the end unless an explicit
   // order was given) and renumbers siblings so orders stay unique.
   await applyBirthOrder(parsed.data.familyId, String(person._id), parsed.data.order);

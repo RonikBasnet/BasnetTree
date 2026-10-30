@@ -13,6 +13,7 @@ import { FamilyTreeView } from "@/components/tree/FamilyTreeView";
 import { formatBsYear } from "@/lib/nepali-date";
 import { genderClasses } from "@/lib/gender";
 import { computeSiblingGroups, renumberGroup } from "@/lib/siblings";
+import { assumedParents } from "@/lib/spouses";
 import type { PersonData } from "@/types/models";
 
 interface RelationPreset {
@@ -29,6 +30,13 @@ export function PeopleManager({
 }) {
   const router = useRouter();
   const [people, setPeople] = useState(initialPeople);
+  // Re-sync with fresh server data after router.refresh(), since saves can also
+  // update other people (spouse back-links, sibling renumbering).
+  const [syncedInitialPeople, setSyncedInitialPeople] = useState(initialPeople);
+  if (initialPeople !== syncedInitialPeople) {
+    setSyncedInitialPeople(initialPeople);
+    setPeople(initialPeople);
+  }
   const [editing, setEditing] = useState<PersonData | null | undefined>(undefined);
   const [preset, setPreset] = useState<RelationPreset>({});
   const [query, setQuery] = useState("");
@@ -95,12 +103,13 @@ export function PeopleManager({
     }
   }
 
-  // Adding a child from a node links both of that person's spouses as co-parents automatically.
+  // Adding a child links the person's spouse as the second parent when they have
+  // exactly one; with multiple marriages the form asks which spouse is the other parent.
   function handleAddRelative(person: PersonData, type: "spouse" | "child") {
     if (type === "spouse") {
       openAddDialog({ spouses: [person._id] });
     } else {
-      openAddDialog({ parents: [person._id, ...person.spouses] });
+      openAddDialog({ parents: assumedParents(people, person._id) });
     }
   }
 
